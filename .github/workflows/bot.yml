@@ -1,0 +1,25 @@
+name: bot
+on:
+  schedule:
+    - cron: "0 0,5,10,15,20 * * *"
+  workflow_dispatch:
+  push:
+    paths: ["bot/**", ".github/workflows/bot.yml"]
+concurrency:
+  group: bot
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 358
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run bot shift
+        run: |
+          git config user.name "PlayMax Bot"
+          git config user.email "playmax.uzb@gmail.com"
+          cd bot && python3 bot.py
+        env:
+          TG_UZ_TOKEN: ${{ secrets.TG_UZ_TOKEN }}
