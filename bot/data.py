@@ -61,8 +61,41 @@ CATALOG = {
 }
 MACHINES = {k: (name, photo, desc, cat) for cat, (_, items) in CATALOG.items() for k, name, photo, desc in items}
 
-REGIONS = ["Toshkent shahri", "Toshkent viloyati", "Andijon", "Buxoro", "Fargʻona", "Jizzax", "Xorazm",
-           "Namangan", "Navoiy", "Qashqadaryo", "Qoraqalpogʻiston", "Samarqand", "Sirdaryo", "Surxondaryo"]
+GLOBAL_CH = "https://t.me/PlaymaxUZ_AF"
+
+# region -> districts / cities
+REGIONS = {
+    "Toshkent shahri": ["Bektemir", "Chilonzor", "Mirobod", "Mirzo Ulugʻbek", "Olmazor", "Sergeli", "Shayxontohur",
+                        "Uchtepa", "Yakkasaroy", "Yashnobod", "Yunusobod", "Yangihayot"],
+    "Toshkent viloyati": ["Nurafshon", "Angren", "Bekobod", "Chirchiq", "Olmaliq", "Ohangaron", "Yangiyoʻl",
+                          "Zangiota", "Qibray", "Toshkent tumani", "Parkent", "Boʻstonliq", "Chinoz", "Piskent"],
+    "Andijon": ["Andijon shahri", "Asaka", "Xonobod", "Shahrixon", "Paxtaobod", "Qoʻrgʻontepa", "Baliqchi",
+                "Izboskan", "Marhamat", "Oltinkoʻl"],
+    "Buxoro": ["Buxoro shahri", "Kogon", "Gʻijduvon", "Vobkent", "Romitan", "Qorakoʻl", "Olot", "Jondor", "Shofirkon"],
+    "Fargʻona": ["Fargʻona shahri", "Margʻilon", "Qoʻqon", "Quvasoy", "Quva", "Rishton", "Oltiariq", "Beshariq", "Toshloq"],
+    "Jizzax": ["Jizzax shahri", "Gʻallaorol", "Zomin", "Paxtakor", "Doʻstlik", "Forish", "Baxmal"],
+    "Xorazm": ["Urganch", "Xiva", "Hazorasp", "Gurlan", "Xonqa", "Shovot", "Bogʻot", "Yangiariq"],
+    "Namangan": ["Namangan shahri", "Chust", "Chortoq", "Kosonsoy", "Pop", "Uchqoʻrgʻon", "Toʻraqoʻrgʻon", "Yangiqoʻrgʻon"],
+    "Navoiy": ["Navoiy shahri", "Zarafshon", "Uchquduq", "Karmana", "Nurota", "Qiziltepa"],
+    "Qashqadaryo": ["Qarshi", "Shahrisabz", "Kitob", "Gʻuzor", "Muborak", "Koson", "Yakkabogʻ", "Chiroqchi"],
+    "Qoraqalpogʻiston": ["Nukus", "Xoʻjayli", "Toʻrtkoʻl", "Beruniy", "Chimboy", "Qoʻngʻirot", "Ellikqalʼa"],
+    "Samarqand": ["Samarqand shahri", "Kattaqoʻrgʻon", "Urgut", "Jomboy", "Bulungʻur", "Pastdargʻom", "Ishtixon", "Payariq"],
+    "Sirdaryo": ["Guliston", "Yangiyer", "Shirin", "Sirdaryo", "Boyovut", "Sardoba"],
+    "Surxondaryo": ["Termiz", "Denov", "Sherobod", "Shoʻrchi", "Jarqoʻrgʻon", "Qumqoʻrgʻon", "Boysun"],
+}
+REGION_NAMES = list(REGIONS)
+
+PARTNER_TYPES = {
+    "diler": "🏪 Hududimda diler / vakil boʻlish",
+    "ulgurji": "📦 Ulgurji xarid (koʻp avtomat)",
+    "markaz": "🎮 Oʻyin markazi ochish (toʻliq loyiha)",
+    "joy": "🤝 Joyim bor — daromadni boʻlishamiz",
+    "ijara": "🎉 Tadbir / bayram uchun ijaraga olish",
+    "yetkaz": "🏭 Yetkazib beruvchi / ishlab chiqarish hamkorligi",
+    "boshqa": "✍️ Boshqa — oʻzim yozaman",
+}
+
+CONDITIONS = {"yangi": "✨ Yangidek", "yaxshi": "👍 Yaxshi holatda", "tamir": "🔧 Taʼmir kerak"}
 
 # --- profit calculator assumptions (rough, shown as an estimate) ---
 CALC_MACHINES = {"boks": ("🥊 Boks avtomati", 0.05), "sovga": ("🎁 Sovgʻa avtomati", 0.06),

@@ -101,28 +101,43 @@ def esc(s):
 MENU = [
     [("📋 Katalog", "cat"), ("🛒 Buyurtma berish", "order")],
     [("💰 Narxni bilish", "price"), ("🧮 Daromad kalkulyatori", "calc")],
-    [("🛠 Servis va taʼmirlash", "service"), ("🏆 Eng kuchli zarba", "chal")],
-    [("📅 Koʻrgazmaga yozilish", "visit"), ("🚚 Yetkazish narxi", "deliv")],
-    [("🎥 Jonli video soʻrash", "live"), ("📸 Avtomatim — joyimda", "show")],
-    [("🤝 Diler boʻlish", "dealer"), ("📍 Manzillar", "loc")],
-    [("📞 Aloqa", "contact"), ("🌐 Sayt", SITE)],
+    [("🛠 Servis va taʼmirlash", "service"), ("📅 Tashrif buyurish", "visit")],
+    [("🚚 Yetkazish narxi", "deliv"), ("🤝 Hamkorlik", "partner")],
+    [("🏆 Eng kuchli zarba", "chal"), ("♻️ PLAYMAX avtomatimni sotaman", "resell")],
+    [("🎥 Jonli video", "live"), ("📸 Avtomatim — joyimda", "show")],
+    [("📍 Manzillar", "loc"), ("📞 Aloqa", "contact")],
+    [("🌍 Xalqaro kanal", "global"), ("🌐 Sayt", SITE)],
 ]
 BACK = [("⬅️ Bosh menyu", "menu")]
+LINKS = [[("📸 Instagram", IG), ("🌐 Sayt", SITE)], [("📢 Kanal", CH_URL), ("🌍 Xalqaro kanal", GLOBAL_CH)]]
+CANCEL = [("❌ Bekor qilish", "cancel")]
+CFG_F = os.path.join(ROOT, "data", "config.json")
+
+
+def cfg():
+    return load(CFG_F, {})
 
 
 def home(chat, name=""):
     hi = f"Assalomu alaykum, {esc(name)}! 👋\n\n" if name else ""
     return call("sendPhoto", chat_id=chat, photo=RAW + "showcase-product-lineup.jpg", parse_mode="HTML",
                 caption=hi + "<b>PLAYMAX</b> — oʻyin avtomatlari Oʻzbekistonda 🇺🇿\n\n"
-                "Bu yerda katalogni koʻrishingiz, buyurtma berishingiz, daromadingizni hisoblashingiz "
-                "va servis soʻrashingiz mumkin. Tanlang 👇",
+                "Katalog, buyurtma, narx, servis va boshqa xizmatlar — hammasi shu yerda. Tanlang 👇",
                 reply_markup=ikb(MENU))
 
 
 def contact(chat):
     say(chat, "📞 <b>Biz bilan bogʻlaning</b>\n\n"
-        f"📞 {P1}\n📞 {P2}\n✉️ {EMAIL}\n🌐 playmaxuz.com\n\n📍 Koʻrgazma: {SHOWROOM}",
-        [[("🌐 Sayt", SITE), ("📸 Instagram", IG)], [("📢 Kanal", CH_URL)], BACK])
+        f"📞 {P1}\n📞 {P2}\n✉️ {EMAIL}\n🌐 playmaxuz.com\n📸 Instagram: {IG}\n\n📍 Koʻrgazma: {SHOWROOM}",
+        LINKS + [BACK])
+
+
+def global_ch(chat):
+    say(chat, "🌍 <b>PLAYMAX — xalqaro kanal</b>\n\n"
+        "Bu ham PLAYMAX — xuddi shu avtomatlar va xizmatlar, lekin boshqa davlatlar va tillar uchun: "
+        "oʻzbek, rus, dari, ingliz va arab tillarida.\n\n"
+        "Qarindosh yoki hamkoringiz boshqa davlatda boʻlsa — ularga ulashing. Hamma oʻz tilida, qulay xizmat oladi 🤝",
+        [[("🌍 Xalqaro kanalga qoʻshilish", GLOBAL_CH)], BACK])
 
 
 def locations(chat):
@@ -130,13 +145,12 @@ def locations(chat):
          address="Toshkent", reply_markup=ikb([[("🚗 Ofisga yoʻl (Yandex)", ROUTE_OFFICE)]]))
     call("sendVenue", chat_id=chat, latitude=FACTORY[0], longitude=FACTORY[1], title="🏭 PLAYMAX zavodi",
          address="Toshkent", reply_markup=ikb([[("🚗 Zavodga yoʻl (Yandex)", ROUTE_FACTORY)]]))
-    say(chat, f"📍 Koʻrgazma: {SHOWROOM}\n\nKelishdan oldin qoʻngʻiroq qiling 👇" + FOOT,
-        [[("📅 Koʻrgazmaga yozilish", "visit")], BACK])
+    say(chat, f"📍 Koʻrgazma: {SHOWROOM}\n\nKelishdan oldin vaqtni band qiling 👇" + FOOT,
+        [[("📅 Tashrif buyurish", "visit")], BACK])
 
 
 def catalog(chat):
-    rows = [[(t, f"c:{k}")] for k, (t, _) in CATALOG.items()]
-    say(chat, "📋 <b>Katalog</b> — turini tanlang 👇", rows + [BACK])
+    say(chat, "📋 <b>Katalog</b> — turini tanlang 👇", [[(t, f"c:{k}")] for k, (t, _) in CATALOG.items()] + [BACK])
 
 
 def category(chat, key):
@@ -153,20 +167,28 @@ def machine(chat, key):
                            [("⬅️ Orqaga", f"c:{cat}"), ("🏠 Menyu", "menu")]]))
 
 
-# ---------------------------------------------------------------- admin cards
+# ---------------------------------------------------------------- admin cards (private only)
 def user_line(u):
     name = esc(" ".join(x for x in (u.get("first_name"), u.get("last_name")) if x))
     uname = f" @{u['username']}" if u.get("username") else ""
     return f'👤 <a href="tg://user?id={u["id"]}">{name or "Mijoz"}</a>{esc(uname)} · ID <code>{u["id"]}</code>'
 
 
-def notify(kind, u, fields, media=None, approve=None):
+def targets():
+    t = cfg().get("notify")
+    return [t] if t else ADMINS
+
+
+def notify(kind, u, fields, media=None, approve=None, extra_media=None):
     now = dt.datetime.now(TZ).strftime("%d.%m %H:%M")
     text = f"🔔 <b>{kind}</b> · {now}\n{user_line(u)}\n\n" + "\n".join(f"<b>{esc(k)}:</b> {esc(v)}" for k, v in fields if v)
     rows = [[("💬 Mijozga yozish", f"tg://user?id={u['id']}")]]
     if approve:
-        rows = [[("✅ Kanalga chiqarish", f"ok:{approve}"), ("❌ Rad etish", f"no:{approve}")]] + rows
-    for a in ADMINS:
+        rows = [[("✅ Tasdiqlash", f"ok:{approve}"), ("❌ Rad etish", f"no:{approve}")]] + rows
+    for a in targets():
+        for typ, fid in (extra_media or []):
+            m = {"photo": "sendPhoto", "video": "sendVideo", "document": "sendDocument"}[typ]
+            call(m, chat_id=a, **{typ: fid})
         if media:
             typ, fid = media
             m = {"photo": "sendPhoto", "video": "sendVideo", "document": "sendDocument"}[typ]
@@ -176,79 +198,94 @@ def notify(kind, u, fields, media=None, approve=None):
 
 
 # ---------------------------------------------------------------- flows
+def region_kb(prefix="rg"):
+    rows, row = [], []
+    for i, r in enumerate(REGION_NAMES):
+        row.append((r, f"{prefix}:{i}"))
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    return rows + [CANCEL]
+
+
+def district_kb(ri):
+    rows, row = [], []
+    for j, dname in enumerate(REGIONS[REGION_NAMES[ri]]):
+        row.append((dname, f"ds:{ri}:{j}"))
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    return rows + [[("✍️ Boshqa joy — yozaman", f"ds:{ri}:x")], CANCEL]
+
+
+def ask(chat, text, rows=None):
+    return say(chat, text, (rows or []) + [CANCEL])
+
+
 def start_flow(u, chat, flow, **d):
     STATE[u["id"]] = {"flow": flow, "step": "", "d": d}
     st = STATE[u["id"]]
     if flow == "order":
         if d.get("machine"):
-            st["step"] = "city"
-            return ask_city(chat, "🛒 <b>" + esc(MACHINES[d["machine"]][0]) + "</b>\n\nQaysi shahar yoki viloyatga kerak?")
+            st["step"] = "region"
+            return say(chat, f"🛒 <b>{esc(MACHINES[d['machine']][0])}</b>\n\nQaysi viloyatga kerak? 👇", region_kb())
         st["step"] = "what"
-        return say(chat, "🛒 <b>Buyurtma</b>\n\nQaysi avtomat kerak? Katalogdan tanlang yoki yozing / rasm yuboring 👇",
-                   [[("📋 Katalogdan tanlash", "cat")], [("❌ Bekor qilish", "cancel")]])
+        return ask(chat, "🛒 <b>Buyurtma</b>\n\nQaysi avtomat kerak? Katalogdan tanlang, yoki yozing / rasm yuboring 👇", [[("📋 Katalogdan tanlash", "cat")]])
     if flow == "price":
         st["step"] = "phone"
-        what = f" (<b>{esc(MACHINES[d['machine']][0])}</b>)" if d.get("machine") else ""
-        return ask_phone(chat, f"💰 Narxni bilish{what}\n\nRaqamingizni yuboring — menejer siz bilan bogʻlanib, narx va shartlarni aytadi 👇")
+        what = f" — <b>{esc(MACHINES[d['machine']][0])}</b>" if d.get("machine") else ""
+        return ask_phone(chat, f"💰 Narxni bilish{what}\n\nRaqamingizni yuboring — menejer narx va shartlarni aytadi 👇")
     if flow == "service":
         st["step"] = "problem"
-        return say(chat, "🛠 <b>Servis va taʼmirlash</b>\n\nMuammoni yozing. Rasm yoki video ham yuborishingiz mumkin 👇",
-                   [[("❌ Bekor qilish", "cancel")]])
-    if flow == "chal":
-        st["step"] = "video"
-        return say(chat, "🏆 <b>Eng kuchli zarba</b>\n\nBoks avtomatida zarbangiz videosini yuboring (natija tabloda koʻrinib tursin). "
-                   "Eng yaxshilari kanalda chiqadi va har hafta TOP-5 eʼlon qilinadi 💪",
-                   [[("🏅 Haftalik reyting", "top")], [("❌ Bekor qilish", "cancel")]])
+        return ask(chat, "🛠 <b>Servis va taʼmirlash</b>\n\nMuammoni yozing. Rasm yoki video ham yuborishingiz mumkin 👇")
     if flow == "visit":
-        st["step"] = "day"
-        today = dt.datetime.now(TZ).date()
-        names = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
-        days = [today + dt.timedelta(days=i) for i in range(1, 8)]
-        rows, row = [], []
-        for dday in days:
-            row.append((f"{names[dday.weekday()]} {dday:%d.%m}", f"vd:{dday:%d.%m}"))
-            if len(row) == 3:
-                rows.append(row); row = []
-        if row:
-            rows.append(row)
-        return say(chat, f"📅 <b>Koʻrgazmaga yozilish</b>\n📍 {SHOWROOM}\n\nQaysi kuni kelasiz?", rows + [[("❌ Bekor qilish", "cancel")]])
+        st["step"] = "place"
+        return ask(chat, "📅 <b>Tashrif buyurish</b>\n\nQayerga kelmoqchisiz? 👇",
+                   [[("🏢 Ofis va koʻrgazma", "vp:ofis")], [("🏭 Zavod", "vp:zavod")]])
     if flow == "deliv":
         st["step"] = "region"
-        return ask_city(chat, "🚚 <b>Yetkazish narxi</b>\n\nViloyatingizni tanlang 👇")
+        return say(chat, "🚚 <b>Yetkazish narxi</b>\n\nViloyatingizni tanlang 👇", region_kb())
+    if flow == "partner":
+        st["step"] = "type"
+        return ask(chat, "🤝 <b>PLAYMAX bilan hamkorlik</b>\n\nQanday hamkorlik sizni qiziqtiradi? 👇",
+                   [[(t, f"pt:{k}")] for k, t in PARTNER_TYPES.items()])
     if flow == "live":
         if d.get("machine"):
             st["step"] = "phone"
-            return ask_phone(chat, f"🎥 <b>{esc(MACHINES[d['machine']][0])}</b> — jonli video\n\nRaqamingizni yuboring, avtomat ishlayotgan videoni Telegram orqali yuboramiz 👇")
+            return ask_phone(chat, f"🎥 <b>{esc(MACHINES[d['machine']][0])}</b> — jonli video\n\nRaqamingizni yuboring, ishlayotgan videoni yuboramiz 👇")
         st["step"] = "what"
-        return say(chat, "🎥 <b>Jonli video</b>\n\nQaysi avtomatni ishlayotgan holda koʻrmoqchisiz?", [[("📋 Katalogdan tanlash", "cat")], [("❌ Bekor qilish", "cancel")]])
+        return ask(chat, "🎥 <b>Jonli video</b>\n\nQaysi avtomatni koʻrmoqchisiz?", [[("📋 Katalogdan tanlash", "cat")]])
+    if flow == "chal":
+        st["step"] = "logo"
+        return ask(chat, "🏆 <b>Eng kuchli zarba</b>\n\nFaqat <b>PLAYMAX</b> boks avtomatlari qatnashadi.\n\n"
+                   "1️⃣ Avval avtomatdagi <b>PLAYMAX logotipi</b> rasmini yuboring 👇", [[("🏅 Haftalik reyting", "top")]])
+    if flow == "resell":
+        st["step"] = "logo"
+        d["photos"] = []
+        return ask(chat, "♻️ <b>PLAYMAX avtomatingizni sotish</b>\n\nFaqat <b>PLAYMAX</b> avtomatlari qabul qilinadi.\n\n"
+                   "1️⃣ Avtomatdagi <b>PLAYMAX logotipi</b> aniq koʻrinadigan rasmni yuboring 👇")
     if flow == "show":
         st["step"] = "photo"
-        return say(chat, "📸 <b>Avtomatim — joyimda</b>\n\nPLAYMAX avtomati sizning joyingizda turibdimi? Rasmini yuboring — kanalda koʻrsatamiz! 🙌",
-                   [[("❌ Bekor qilish", "cancel")]])
-    if flow == "dealer":
-        st["step"] = "city"
-        return ask_city(chat, "🤝 <b>Diler boʻlish</b>\n\nQaysi shahar / viloyatda ishlamoqchisiz?")
+        return ask(chat, "📸 <b>Avtomatim — joyimda</b>\n\nPLAYMAX avtomati sizning joyingizda turibdimi? Rasmini yuboring (logotip koʻrinsin) 👇")
     if flow == "calc":
         st["step"] = "m"
-        return say(chat, "🧮 <b>Daromad kalkulyatori</b>\n\nQaysi avtomat? 👇",
-                   [[(t, f"k:m:{k}")] for k, (t, _) in CALC_MACHINES.items()] + [[("❌ Bekor qilish", "cancel")]])
-
-
-def ask_city(chat, text):
-    rows, row = [], []
-    for i, r in enumerate(REGIONS):
-        row.append((r, f"rg:{i}"))
-        if len(row) == 2:
-            rows.append(row); row = []
-    if row:
-        rows.append(row)
-    return say(chat, text, rows + [[("❌ Bekor qilish", "cancel")]])
+        return ask(chat, "🧮 <b>Daromad kalkulyatori</b>\n\nQaysi avtomat? 👇", [[(t, f"k:m:{k}")] for k, (t, _) in CALC_MACHINES.items()])
 
 
 def finish(u, chat, text):
     STATE.pop(u["id"], None)
     drop_kb(chat, text)
-    say(chat, "Yana nima kerak? 👇", [BACK])
+    say(chat, f"📞 {P1}\n📞 {P2}\n✉️ {EMAIL}\n\nYana nima kerak? 👇", LINKS + [BACK])
+
+
+def save_pending(kind, u, d):
+    pid = f"{kind[0]}{int(time.time())}{u['id'] % 1000}"
+    pend = load(PEND_F, {})
+    pend[pid] = {"type": kind, "user": {k: u.get(k) for k in ("id", "first_name", "username")}, **d}
+    save(PEND_F, pend)
+    return pid
 
 
 def handle_flow(u, chat, msg=None, cb=None):
@@ -256,140 +293,241 @@ def handle_flow(u, chat, msg=None, cb=None):
     if not st:
         return False
     f, step, d = st["flow"], st["step"], st["d"]
-    text = (msg or {}).get("text", "") if msg else ""
-    contact_ = (msg or {}).get("contact") if msg else None
-    media = None
+    text, media = "", None
     if msg:
+        text = msg.get("text") or msg.get("caption") or ""
         if msg.get("photo"):
             media = ("photo", msg["photo"][-1]["file_id"])
         elif msg.get("video"):
             media = ("video", msg["video"]["file_id"])
         elif msg.get("document"):
             media = ("document", msg["document"]["file_id"])
-        if msg.get("caption"):
-            text = msg["caption"]
     if text == "❌ Bekor qilish":
         STATE.pop(u["id"], None)
         drop_kb(chat, "Bekor qilindi.")
-        return home(chat) or True
-    phone = (contact_ or {}).get("phone_number") or (text if step == "phone" and any(ch.isdigit() for ch in text) else None)
+        home(chat)
+        return True
+    contact_ = (msg or {}).get("contact")
+    phone = (contact_ or {}).get("phone_number") or (text if step == "phone" and sum(c.isdigit() for c in text) >= 7 else None)
+    if step == "phone" and msg and not phone:
+        ask_phone(chat, "📱 Iltimos, telefon raqamingizni yuboring (tugmani bosing yoki yozing) 👇")
+        return True
 
-    # --- region / city selection shared
+    # shared: region -> district
     if cb and cb.startswith("rg:"):
-        d["city"] = REGIONS[int(cb[3:])]
-        if f == "order":
-            st["step"] = "phone"
-            return ask_phone(chat, "📱 Raqamingizni yuboring — menejer siz bilan bogʻlanadi 👇") or True
+        d["region"] = REGION_NAMES[int(cb[3:])]
         if f == "deliv":
-            st["step"] = "phone"
-            return ask_phone(chat, f"🚚 {esc(d['city'])}\n\nRaqamingizni yuboring — yetkazish narxini aytamiz 👇") or True
-        if f == "dealer":
-            st["step"] = "exp"
-            return say(chat, "Oʻzingiz haqingizda qisqacha yozing: tajribangiz, joyingiz yoki doʻkoningiz bormi? 👇") or True
+            st["step"] = "district"
+            say(chat, f"📍 {esc(d['region'])} — tuman yoki shaharni tanlang 👇", district_kb(int(cb[3:])))
+            return True
+        st["step"] = "phone"
+        ask_phone(chat, "📱 Raqamingizni yuboring — menejer siz bilan bogʻlanadi 👇")
+        return True
+    if cb and cb.startswith("ds:"):
+        _, ri, j = cb.split(":")
+        if j == "x":
+            st["step"] = "district_text"
+            ask(chat, "Tuman / shahar nomini yozing 👇")
+            return True
+        d["district"] = REGIONS[REGION_NAMES[int(ri)]][int(j)]
+        st["step"] = "phone"
+        ask_phone(chat, f"🚚 {esc(d['region'])}, {esc(d['district'])}\n\nRaqamingizni yuboring — yetkazish narxini aytamiz 👇")
+        return True
+    if step == "district_text" and text:
+        d["district"] = text
+        st["step"] = "phone"
+        ask_phone(chat, "📱 Raqamingizni yuboring 👇")
+        return True
 
     if f == "order":
         if step == "what" and (text or media):
             d["what"], d["media"] = text, media
-            st["step"] = "city"
-            return ask_city(chat, "Qaysi shahar yoki viloyatga kerak?") or True
+            st["step"] = "region"
+            say(chat, "Qaysi viloyatga kerak? 👇", region_kb())
+            return True
         if step == "phone" and phone:
             m = MACHINES.get(d.get("machine"), ("",))[0]
-            notify("🛒 YANGI BUYURTMA", u, [("Avtomat", m or d.get("what")), ("Shahar", d.get("city")), ("Telefon", phone)], d.get("media"))
-            return finish(u, chat, "✅ Buyurtmangiz qabul qilindi! Menejer tez orada siz bilan bogʻlanadi.\n\n"
-                          f"Shoshilinch boʻlsa: {P1} / {P2}") or True
+            notify("🛒 YANGI BUYURTMA", u, [("Avtomat", m or d.get("what")), ("Viloyat", d.get("region")), ("Telefon", phone)], d.get("media"))
+            finish(u, chat, "✅ Buyurtmangiz qabul qilindi! Menejer tez orada bogʻlanadi.")
+            return True
     if f == "price" and step == "phone" and phone:
         m = MACHINES.get(d.get("machine"), ("",))[0]
         notify("💰 NARX SOʻRALDI", u, [("Avtomat", m or "Umumiy"), ("Telefon", phone)])
-        return finish(u, chat, "✅ Rahmat! Menejer tez orada qoʻngʻiroq qilib, narxlarni aytadi.") or True
+        finish(u, chat, "✅ Rahmat! Menejer tez orada qoʻngʻiroq qilib, narxlarni aytadi.")
+        return True
     if f == "service":
         if step == "problem" and (text or media):
             d["problem"], d["media"] = text, media
             st["step"] = "model"
-            return say(chat, "Qaysi avtomat? (nomini yozing yoki «bilmayman»)") or True
+            ask(chat, "Qaysi avtomat? (nomini yozing yoki «bilmayman»)")
+            return True
         if step == "model" and text:
             d["model"] = text
             st["step"] = "phone"
-            return ask_phone(chat, "📱 Raqamingizni yuboring — usta siz bilan bogʻlanadi 👇") or True
+            ask_phone(chat, "📱 Raqamingizni yuboring — usta siz bilan bogʻlanadi 👇")
+            return True
         if step == "phone" and phone:
             notify("🛠 SERVIS SOʻROVI", u, [("Muammo", d.get("problem") or "(rasm/video)"), ("Avtomat", d.get("model")), ("Telefon", phone)], d.get("media"))
-            return finish(u, chat, "✅ Soʻrovingiz qabul qilindi! Usta tez orada bogʻlanadi.") or True
-    if f == "chal":
-        if step == "video" and media and media[0] in ("video", "document"):
-            d["media"] = media
-            st["step"] = "score"
-            return say(chat, "💪 Zoʻr! Natijangiz nechchi? Faqat raqam yozing (masalan 987):") or True
-        if step == "score" and text.strip().isdigit():
-            d["score"] = int(text.strip())
-            st["step"] = "where"
-            return say(chat, "📍 Qayerda urdingiz? (shahar va joy nomi):") or True
-        if step == "where" and text:
-            pid = f"c{int(time.time())}{u['id'] % 1000}"
-            pend = load(PEND_F, {})
-            pend[pid] = {"type": "chal", "user": {k: u.get(k) for k in ("id", "first_name", "username")},
-                         "media": d["media"], "score": d["score"], "where": text}
-            save(PEND_F, pend)
-            notify("🏆 TOP ZARBA — tasdiqlash", u, [("Natija", d["score"]), ("Joy", text)], d["media"], approve=pid)
-            return finish(u, chat, "✅ Videongiz yuborildi! Tasdiqlangandan keyin kanalda chiqadi va reytingga qoʻshiladi 🏆") or True
+            finish(u, chat, "✅ Soʻrovingiz qabul qilindi! Usta tez orada bogʻlanadi.")
+            return True
     if f == "visit":
+        if cb and cb.startswith("vp:"):
+            d["place"] = "🏢 Ofis va koʻrgazma" if cb[3:] == "ofis" else "🏭 Zavod"
+            st["step"] = "day"
+            today = dt.datetime.now(TZ).date()
+            names = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
+            rows, row = [], []
+            for i in range(1, 8):
+                dd = today + dt.timedelta(days=i)
+                row.append((f"{names[dd.weekday()]} {dd:%d.%m}", f"vd:{dd:%d.%m}"))
+                if len(row) == 3:
+                    rows.append(row); row = []
+            if row:
+                rows.append(row)
+            ask(chat, f"{d['place']}\n\nQaysi kuni kelasiz? 👇", rows)
+            return True
         if cb and cb.startswith("vd:"):
             d["day"] = cb[3:]
             st["step"] = "time"
-            return say(chat, "Soat nechida? 👇", [[("10:00–12:00", "vt:10:00–12:00"), ("12:00–15:00", "vt:12:00–15:00")],
-                                                  [("15:00–18:00", "vt:15:00–18:00"), ("18:00 dan keyin", "vt:18:00+")]]) or True
+            ask(chat, "Soat nechida? 👇", [[("10:00–12:00", "vt:10:00–12:00"), ("12:00–15:00", "vt:12:00–15:00")],
+                                          [("15:00–18:00", "vt:15:00–18:00"), ("18:00 dan keyin", "vt:18:00+")]])
+            return True
         if cb and cb.startswith("vt:"):
             d["time"] = cb[3:]
             st["step"] = "phone"
-            return ask_phone(chat, "📱 Raqamingizni yuboring — tashrifingizni tasdiqlaymiz 👇") or True
+            ask_phone(chat, "📱 Raqamingizni yuboring — tashrifni tasdiqlaymiz 👇")
+            return True
         if step == "phone" and phone:
-            notify("📅 KOʻRGAZMAGA TASHRIF", u, [("Kun", d.get("day")), ("Vaqt", d.get("time")), ("Telefon", phone)])
-            return finish(u, chat, f"✅ Siz {d.get('day')} kuni {d.get('time')} ga yozildingiz!\n📍 {SHOWROOM}\n\nMenejer tasdiqlash uchun qoʻngʻiroq qiladi.") or True
+            notify("📅 TASHRIF", u, [("Joy", d.get("place")), ("Kun", d.get("day")), ("Vaqt", d.get("time")), ("Telefon", phone)])
+            finish(u, chat, f"✅ {d.get('place')} — {d.get('day')}, {d.get('time')}.\nMenejer tasdiqlash uchun qoʻngʻiroq qiladi.")
+            return True
     if f == "deliv" and step == "phone" and phone:
-        notify("🚚 YETKAZISH NARXI", u, [("Viloyat", d.get("city")), ("Telefon", phone)])
-        return finish(u, chat, "✅ Rahmat! Yetkazish narxini tez orada aytamiz.") or True
+        notify("🚚 YETKAZISH NARXI", u, [("Viloyat", d.get("region")), ("Tuman / shahar", d.get("district")), ("Telefon", phone)])
+        finish(u, chat, "✅ Rahmat! Yetkazish narxini tez orada aytamiz.")
+        return True
+    if f == "partner":
+        if cb and cb.startswith("pt:"):
+            d["type"] = PARTNER_TYPES[cb[3:]]
+            st["step"] = "details"
+            ask(chat, f"{d['type']}\n\nQisqacha yozing: nima taklif qilasiz yoki nima kerak? 👇", [[("⏭ Oʻtkazib yuborish", "skip")]])
+            return True
+        if step == "details" and (text or cb == "skip"):
+            d["details"] = text
+            st["step"] = "region"
+            say(chat, "Qaysi viloyatdasiz? 👇", region_kb())
+            return True
+        if step == "phone" and phone:
+            notify("🤝 HAMKORLIK", u, [("Turi", d.get("type")), ("Tafsilot", d.get("details")), ("Viloyat", d.get("region")), ("Telefon", phone)])
+            finish(u, chat, "✅ Taklifingiz qabul qilindi! Hamkorlik boʻyicha menejer bogʻlanadi.")
+            return True
     if f == "live":
         if step == "what" and text:
             d["what"] = text
             st["step"] = "phone"
-            return ask_phone(chat, "📱 Raqamingizni yuboring 👇") or True
+            ask_phone(chat, "📱 Raqamingizni yuboring 👇")
+            return True
         if step == "phone" and phone:
             m = MACHINES.get(d.get("machine"), ("",))[0]
-            notify("🎥 JONLI VIDEO SOʻRALDI", u, [("Avtomat", m or d.get("what")), ("Telefon", phone)])
-            return finish(u, chat, "✅ Qabul qilindi! Video tez orada sizga yuboriladi.") or True
+            notify("🎥 JONLI VIDEO", u, [("Avtomat", m or d.get("what")), ("Telefon", phone)])
+            finish(u, chat, "✅ Qabul qilindi! Video tez orada yuboriladi.")
+            return True
+    if f == "chal":
+        if step == "logo" and media and media[0] == "photo":
+            d["logo"] = media
+            st["step"] = "video"
+            ask(chat, "2️⃣ Endi zarbangiz videosini yuboring — natija tabloda koʻrinsin 👇")
+            return True
+        if step == "logo" and msg:
+            ask(chat, "Iltimos, PLAYMAX logotipi koʻrinadigan <b>rasm</b> yuboring 👇")
+            return True
+        if step == "video" and media and media[0] in ("video", "document"):
+            d["media"] = media
+            st["step"] = "score"
+            ask(chat, "3️⃣ Natijangiz nechchi? Faqat raqam (masalan 987):")
+            return True
+        if step == "score" and text.strip().isdigit():
+            d["score"] = int(text.strip())
+            st["step"] = "where"
+            ask(chat, "4️⃣ Qayerda urdingiz? (shahar va joy nomi):")
+            return True
+        if step == "where" and text:
+            pid = save_pending("chal", u, {"media": d["media"], "score": d["score"], "where": text})
+            notify("🏆 ENG KUCHLI ZARBA — tekshirish", u, [("Natija", d["score"]), ("Joy", text),
+                   ("Tekshiring", "PLAYMAX avtomatimi? Logotip rasmi yuqorida")], d["media"], approve=pid, extra_media=[d["logo"]])
+            finish(u, chat, "✅ Videongiz tekshiruvga yuborildi! PLAYMAX avtomati ekani tasdiqlansa, reytingga qoʻshiladi 🏆")
+            return True
+    if f == "resell":
+        if step == "logo" and media and media[0] == "photo":
+            d["logo"] = media
+            st["step"] = "photos"
+            ask(chat, "2️⃣ Avtomatning umumiy rasmlarini yuboring (1–5 ta). Tayyor boʻlgach tugmani bosing 👇", [[("✅ Tayyor", "rs:done")]])
+            return True
+        if step == "logo" and msg:
+            ask(chat, "Iltimos, PLAYMAX logotipi koʻrinadigan <b>rasm</b> yuboring 👇")
+            return True
+        if step == "photos" and media:
+            if len(d["photos"]) < 5:
+                d["photos"].append(media)
+            say(chat, f"📷 {len(d['photos'])} ta rasm qabul qilindi.", [[("✅ Tayyor", "rs:done")]])
+            return True
+        if step == "photos" and cb == "rs:done" and d["photos"]:
+            st["step"] = "model"
+            ask(chat, "3️⃣ Avtomat modeli? (masalan: MANGU, SPACE, KING OF THE HAMMER)")
+            return True
+        if step == "model" and text:
+            d["model"] = text
+            st["step"] = "cond"
+            ask(chat, "4️⃣ Holati qanday? 👇", [[(t, f"cd:{k}")] for k, t in CONDITIONS.items()])
+            return True
+        if cb and cb.startswith("cd:"):
+            d["cond"] = CONDITIONS[cb[3:]]
+            st["step"] = "price"
+            ask(chat, "5️⃣ Narxi (soʻm yoki $) va shahar? Masalan: «25 000 000 soʻm, Samarqand»")
+            return True
+        if step == "price" and text:
+            d["price"] = text
+            st["step"] = "phone"
+            ask_phone(chat, "6️⃣ Xaridorlar bogʻlanishi uchun raqamingizni yuboring 👇")
+            return True
+        if step == "phone" and phone:
+            pid = save_pending("resell", u, {"photos": d["photos"], "model": d["model"], "cond": d["cond"], "price": d["price"], "phone": phone})
+            notify("♻️ AVTOMAT SOTUVI — tekshirish", u, [("Model", d["model"]), ("Holati", d["cond"]), ("Narx / shahar", d["price"]),
+                   ("Telefon", phone), ("Tekshiring", "Logotip rasmi — PLAYMAX avtomatimi?")], d["logo"], approve=pid, extra_media=d["photos"])
+            finish(u, chat, "✅ Eʼloningiz tekshiruvga yuborildi! PLAYMAX avtomati ekani tasdiqlansa, eʼlon chiqariladi.")
+            return True
     if f == "show":
         if step == "photo" and media:
             d["media"] = media
             st["step"] = "place"
-            return say(chat, "Joy nomi va shahar? (masalan: «Family Park, Samarqand»)") or True
+            ask(chat, "Joy nomi va shahar? (masalan: «Family Park, Samarqand»)")
+            return True
         if step == "place" and text:
-            pid = f"s{int(time.time())}{u['id'] % 1000}"
-            pend = load(PEND_F, {})
-            pend[pid] = {"type": "show", "user": {k: u.get(k) for k in ("id", "first_name", "username")}, "media": d["media"], "place": text}
-            save(PEND_F, pend)
-            notify("📸 MIJOZ JOYI — tasdiqlash", u, [("Joy", text)], d["media"], approve=pid)
-            return finish(u, chat, "✅ Rahmat! Tasdiqlangandan keyin kanalda chiqadi 🙌") or True
-    if f == "dealer":
-        if step == "exp" and text:
-            d["exp"] = text
-            st["step"] = "phone"
-            return ask_phone(chat, "📱 Raqamingizni yuboring 👇") or True
-        if step == "phone" and phone:
-            notify("🤝 DILERLIK ARIZASI", u, [("Hudud", d.get("city")), ("Maʼlumot", d.get("exp")), ("Telefon", phone)])
-            return finish(u, chat, "✅ Arizangiz qabul qilindi! Hamkorlik boʻyicha menejer bogʻlanadi.") or True
+            pid = save_pending("show", u, {"media": d["media"], "place": text})
+            notify("📸 MIJOZ JOYI — tekshirish", u, [("Joy", text)], d["media"], approve=pid)
+            finish(u, chat, "✅ Rahmat! Rasmingiz tekshiruvga yuborildi 🙌")
+            return True
     if f == "calc":
         if cb and cb.startswith("k:m:"):
             d["m"] = cb[4:]
             st["step"] = "p"
-            return say(chat, "Avtomat qayerda turadi? 👇", [[(t, f"k:p:{k}")] for k, (t, _) in CALC_PLACES.items()]) or True
+            ask(chat, "Avtomat qayerda turadi? 👇", [[(t, f"k:p:{k}")] for k, (t, _) in CALC_PLACES.items()])
+            return True
         if cb and cb.startswith("k:p:"):
             d["p"] = cb[4:]
             st["step"] = "t"
-            return say(chat, "Kuniga taxminan necha kishi oʻtadi? 👇", [[(t, f"k:t:{k}")] for k, t in CALC_TRAFFIC.items()]) or True
+            ask(chat, "Kuniga taxminan necha kishi oʻtadi? 👇", [[(t, f"k:t:{k}")] for k, t in CALC_TRAFFIC.items()])
+            return True
         if cb and cb.startswith("k:t:"):
             d["t"] = int(cb[4:])
             st["step"] = "price"
-            return say(chat, "Bitta oʻyin narxi necha soʻm boʻladi? Faqat raqam yozing (masalan 5000):") or True
+            ask(chat, "Bitta oʻyin narxi necha soʻm? Faqat raqam (masalan 5000):")
+            return True
         if step == "price" and text.replace(" ", "").isdigit():
-            return calc_result(u, chat, d, int(text.replace(" ", ""))) or True
+            calc_result(u, chat, d, int(text.replace(" ", "")))
+            return True
+    if msg:
+        say(chat, "Iltimos, koʻrsatilgan tugmalardan foydalaning yoki soʻralgan maʼlumotni yuboring 👇", [CANCEL])
+        return True
     return False
 
 
@@ -398,37 +536,35 @@ def calc_result(u, chat, d, price):
     pname, k = CALC_PLACES[d["p"]]
     plays = max(5, round(d["t"] * conv * k))
     lo, hi = round(plays * 0.7), round(plays * 1.3)
-    day_lo, day_hi = lo * price, hi * price
     fmt = lambda x: f"{x:,}".replace(",", " ")
     tip = {"mall": "Kirish yoki oziq-ovqat zonasi yoniga qoʻying.", "cafe": "Kutish joyi yoniga — odamlar vaqt oʻtkazadi.",
            "park": "Yoʻlak boʻyida, yorugʻ joyda turgani yaxshi.", "zal": "Rekord tablosini kirishdan koʻrinadigan qiling.",
            "dokon": "Kassa yoki bolalar boʻlimi yoniga qoʻying.", "azs": "Doʻkon kirishida, yorugʻ joyda turgani yaxshi."}[d["p"]]
     STATE.pop(u["id"], None)
     say(chat, f"🧮 <b>Taxminiy hisob</b>\n\n{mname} · {pname}\n👥 Kuniga ~{d['t']} kishi · 🎟 {fmt(price)} soʻm\n\n"
-        f"🎮 Kuniga taxminan <b>{lo}–{hi}</b> oʻyin\n💰 Kunlik: <b>{fmt(day_lo)} – {fmt(day_hi)} soʻm</b>\n"
-        f"📅 Oylik (30 kun): <b>{fmt(day_lo * 30)} – {fmt(day_hi * 30)} soʻm</b>\n\n💡 {tip}\n\n"
+        f"🎮 Kuniga taxminan <b>{lo}–{hi}</b> oʻyin\n💰 Kunlik: <b>{fmt(lo*price)} – {fmt(hi*price)} soʻm</b>\n"
+        f"📅 Oylik (30 kun): <b>{fmt(lo*price*30)} – {fmt(hi*price*30)} soʻm</b>\n\n💡 {tip}\n\n"
         "⚠️ Bu taxminiy misol. Haqiqiy daromad joy, odamlar oqimi va oʻyin narxiga bogʻliq.",
         [[("📞 Aniq hisob uchun menejer", "price")], [("🔁 Qayta hisoblash", "calc")], BACK])
-    notify("🧮 KALKULYATOR ishlatildi", u, [("Avtomat", mname), ("Joy", pname), ("Oqim", d["t"]), ("Oʻyin narxi", price),
-                                           ("Natija (oy)", f"{fmt(day_lo*30)} – {fmt(day_hi*30)}")])
+    notify("🧮 KALKULYATOR", u, [("Avtomat", mname), ("Joy", pname), ("Oqim", d["t"]), ("Oʻyin narxi", price),
+                                ("Natija (oy)", f"{fmt(lo*price*30)} – {fmt(hi*price*30)}")])
 
 
-# ---------------------------------------------------------------- challenge
+# ---------------------------------------------------------------- challenge & community
 def top5():
     board = load(CH_F, [])
     week_ago = time.time() - 7 * 86400
-    week = sorted([b for b in board if b["t"] > week_ago], key=lambda b: -b["score"])[:5]
-    return week
+    return sorted([b for b in board if b["t"] > week_ago], key=lambda b: -b["score"])[:5]
 
 
 def show_top(chat):
     rows = top5()
     if not rows:
-        return say(chat, "🏅 Bu hafta hali natijalar yoʻq. Birinchi boʻling! 💪", [[("🏆 Video yuborish", "chal")], BACK])
+        return say(chat, "🏅 Bu hafta hali natijalar yoʻq. Birinchi boʻling! 💪", [[("🏆 Qatnashish", "chal")], BACK])
     medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
-    txt = "🏅 <b>Haftaning TOP-5 zarbasi</b>\n\n" + "\n".join(
-        f"{medals[i]} <b>{r['score']}</b> — {esc(r['name'])} ({esc(r['where'])})" for i, r in enumerate(rows))
-    say(chat, txt, [[("🏆 Video yuborish", "chal")], BACK])
+    say(chat, "🏅 <b>Haftaning TOP-5 zarbasi</b> (faqat PLAYMAX avtomatlari)\n\n" + "\n".join(
+        f"{medals[i]} <b>{r['score']}</b> — {esc(r['name'])} ({esc(r['where'])})" for i, r in enumerate(rows)),
+        [[("🏆 Qatnashish", "chal")], BACK])
 
 
 def admin_decide(u, data):
@@ -440,25 +576,38 @@ def admin_decide(u, data):
     save(PEND_F, pend)
     if not p:
         return say(u["id"], "Bu soʻrov allaqachon koʻrib chiqilgan.")
-    name = p["user"].get("first_name") or "Mijoz"
+    seller = p["user"]["id"]
     if not ok:
-        say(p["user"]["id"], "Afsuski, yuborgan materialingiz kanalga chiqmadi. Yana urinib koʻring! 🙏")
+        say(seller, "Afsuski, materialingiz tasdiqlanmadi. Faqat PLAYMAX avtomatlari qabul qilinadi 🙏")
         return say(u["id"], "❌ Rad etildi.")
-    typ, fid = p["media"]
-    btn = {"inline_keyboard": [[{"text": "🏆 Ishtirok etish", "url": "https://t.me/playmax_uz_bot?start=chal"}],
-                               [{"text": "🛒 Buyurtma berish", "url": SITE}]]}
+    name = p["user"].get("first_name") or "Mijoz"
     if p["type"] == "chal":
-        cap = f"🏆 <b>Eng kuchli zarba!</b>\n\n💥 Natija: <b>{p['score']}</b>\n👤 {esc(name)}\n📍 {esc(p['where'])}\n\nSiz bundan kuchliroq ura olasizmi? Videongizni botga yuboring 👇" + FOOT
         board = load(CH_F, [])
         board.append({"t": time.time(), "score": p["score"], "name": name, "where": p["where"]})
         save(CH_F, board)
+    community = cfg().get("community")
+    if community:
+        btn = {"inline_keyboard": [[{"text": "🤖 PLAYMAX xizmatlari", "url": "https://t.me/playmax_uz_bot"}]]}
+        if p["type"] == "chal":
+            typ, fid = p["media"]
+            m = {"photo": "sendPhoto", "video": "sendVideo", "document": "sendDocument"}[typ]
+            call(m, chat_id=community, **{typ: fid}, parse_mode="HTML", reply_markup=btn,
+                 caption=f"🏆 <b>Eng kuchli zarba</b>\n\n💥 Natija: <b>{p['score']}</b>\n👤 {esc(name)}\n📍 {esc(p['where'])}")
+        elif p["type"] == "show":
+            typ, fid = p["media"]
+            call("sendPhoto" if typ == "photo" else "sendVideo", chat_id=community, **{typ: fid}, parse_mode="HTML",
+                 reply_markup=btn, caption=f"📸 <b>PLAYMAX avtomati — mijozimiz joyida</b>\n📍 {esc(p['place'])}")
+        elif p["type"] == "resell":
+            group = [{"type": t, "media": f} for t, f in p["photos"] if t in ("photo", "video")][:5]
+            if group:
+                group[0]["caption"] = (f"♻️ <b>Sotiladi: {esc(p['model'])}</b> (PLAYMAX)\n\n{p['cond']}\n💰 {esc(p['price'])}\n"
+                                       f"📞 Sotuvchi: {esc(p['phone'])}")
+                group[0]["parse_mode"] = "HTML"
+                call("sendMediaGroup", chat_id=community, media=group)
+        say(u["id"], "✅ Tasdiqlandi va hamjamiyat kanaliga chiqarildi.")
     else:
-        cap = f"📸 <b>PLAYMAX avtomati — mijozimiz joyida</b>\n\n📍 {esc(p['place'])}\n\nRahmat, ishonchingiz uchun! 🙌\nSizning avtomatingiz ham shu yerda boʻlsin 👇" + FOOT
-        btn = {"inline_keyboard": [[{"text": "🛒 Buyurtma berish", "url": SITE}], [{"text": "🤖 Xizmatlar", "url": "https://t.me/playmax_uz_bot"}]]}
-    m = {"photo": "sendPhoto", "video": "sendVideo", "document": "sendDocument"}[typ]
-    call(m, chat_id=CHANNEL, **{typ: fid}, caption=cap, parse_mode="HTML", reply_markup=btn)
-    say(p["user"]["id"], "🎉 Materialingiz kanalda chiqdi! Rahmat 🙌\n" + CH_URL)
-    say(u["id"], "✅ Kanalga chiqarildi.")
+        say(u["id"], "✅ Tasdiqlandi. (Hamjamiyat kanali hali ulanmagan — /setcommunity @kanal_nomi)")
+    say(seller, "🎉 Materialingiz tasdiqlandi! Rahmat 🙌")
 
 
 # ---------------------------------------------------------------- routing
@@ -477,7 +626,6 @@ def route(u, chat, key):
     if key.startswith("m:"):
         st = STATE.get(u["id"])
         if st and st["flow"] in ("order", "live") and st["step"] == "what":
-            st["d"]["machine"] = key[2:]
             return start_flow(u, chat, st["flow"], machine=key[2:])
         return machine(chat, key[2:])
     if key.startswith("om:"):
@@ -486,7 +634,7 @@ def route(u, chat, key):
         return start_flow(u, chat, "price", machine=key[3:])
     if key.startswith("lm:"):
         return start_flow(u, chat, "live", machine=key[3:])
-    if key in ("order", "price", "service", "chal", "visit", "deliv", "live", "show", "dealer", "calc"):
+    if key in FLOWS:
         return start_flow(u, chat, key)
     if key == "top":
         STATE.pop(u["id"], None)
@@ -495,27 +643,44 @@ def route(u, chat, key):
         return contact(chat)
     if key == "loc":
         return locations(chat)
+    if key == "global":
+        return global_ch(chat)
     return home(chat)
 
 
+FLOWS = ("order", "price", "service", "chal", "visit", "deliv", "live", "show", "partner", "calc", "resell")
+
+
 def on_message(msg):
-    if msg["chat"]["type"] != "private":
-        return
     u, chat = msg["from"], msg["chat"]["id"]
     text = msg.get("text", "") or ""
+    if msg["chat"]["type"] != "private":
+        # admin binds a private admin group for notifications
+        if text.startswith("/setadmin") and u["id"] in ADMINS:
+            c = cfg(); c["notify"] = chat; save(CFG_F, c)
+            say(chat, "✅ Endi barcha soʻrovlar shu guruhga keladi.")
+        return
+    if u["id"] in ADMINS and text.startswith("/setcommunity"):
+        arg = text.split(" ", 1)[1].strip() if " " in text else ""
+        c = cfg(); c["community"] = arg or None; save(CFG_F, c)
+        return say(chat, f"✅ Hamjamiyat kanali: {esc(arg) or 'oʻchirildi'}")
+    if u["id"] in ADMINS and text.startswith("/setadmin"):
+        c = cfg(); c.pop("notify", None); save(CFG_F, c)
+        return say(chat, "✅ Soʻrovlar endi shaxsiy chatga keladi.")
     if text.startswith("/start"):
         arg = text.split(" ", 1)[1] if " " in text else ""
         STATE.pop(u["id"], None)
-        if arg in ("chal", "order", "price", "calc", "service", "visit", "dealer", "show", "live", "deliv"):
+        if arg in FLOWS:
             return start_flow(u, chat, arg)
         if arg == "catalog":
             return catalog(chat)
         return home(chat, u.get("first_name", ""))
     cmds = {"/menu": "menu", "/katalog": "cat", "/buyurtma": "order", "/narx": "price", "/kalkulyator": "calc",
-            "/servis": "service", "/aloqa": "contact", "/manzil": "loc", "/top": "top"}
-    if text.split("@")[0] in cmds:
+            "/servis": "service", "/aloqa": "contact", "/manzil": "loc", "/top": "top", "/hamkorlik": "partner"}
+    c0 = text.split("@")[0].split(" ")[0]
+    if c0 in cmds:
         STATE.pop(u["id"], None)
-        return route(u, chat, cmds[text.split("@")[0]])
+        return route(u, chat, cmds[c0])
     if handle_flow(u, chat, msg=msg):
         return
     low = text.lower()
@@ -533,8 +698,9 @@ def on_callback(q):
     call("answerCallbackQuery", callback_query_id=q["id"])
     if data.startswith(("ok:", "no:")):
         return admin_decide(u, data)
-    if data.startswith(("rg:", "vd:", "vt:", "k:")) and handle_flow(u, chat, cb=data):
-        return
+    if data.startswith(("rg:", "ds:", "vp:", "vd:", "vt:", "k:", "pt:", "cd:", "rs:")) or data == "skip":
+        if handle_flow(u, chat, cb=data):
+            return
     route(u, chat, data)
 
 
@@ -573,7 +739,7 @@ def setup():
         {"command": "menu", "description": "Bosh menyu"}, {"command": "katalog", "description": "Katalog"},
         {"command": "buyurtma", "description": "Buyurtma berish"}, {"command": "narx", "description": "Narxni bilish"},
         {"command": "kalkulyator", "description": "Daromad kalkulyatori"}, {"command": "servis", "description": "Servis va taʼmirlash"},
-        {"command": "top", "description": "Haftaning TOP-5 zarbasi"}, {"command": "aloqa", "description": "Aloqa"},
+        {"command": "top", "description": "Haftaning TOP-5 zarbasi"}, {"command": "hamkorlik", "description": "Hamkorlik"}, {"command": "aloqa", "description": "Aloqa"},
         {"command": "manzil", "description": "Manzillar"}])
 
 
