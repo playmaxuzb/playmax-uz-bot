@@ -659,6 +659,9 @@ def on_message(msg):
         if text.startswith("/setadmin") and u["id"] in ADMINS:
             c = cfg(); c["notify"] = chat; save(CFG_F, c)
             say(chat, "✅ Endi barcha soʻrovlar shu guruhga keladi.")
+        elif text.startswith("/setcommunity") and u["id"] in ADMINS:
+            c = cfg(); c["community"] = chat; save(CFG_F, c)
+            say(chat, "✅ Ulandi! Tasdiqlangan zarbalar va PLAYMAX eʼlonlari shu yerga chiqadi.")
         return
     if u["id"] in ADMINS and text.startswith("/setcommunity"):
         arg = text.split(" ", 1)[1].strip() if " " in text else ""
