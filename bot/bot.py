@@ -652,14 +652,15 @@ FLOWS = ("order", "price", "service", "chal", "visit", "deliv", "live", "show", 
 
 
 def on_message(msg):
-    u, chat = msg["from"], msg["chat"]["id"]
+    u, chat = msg.get("from") or {"id": 0}, msg["chat"]["id"]
+    print("[msg]", msg["chat"].get("type"), chat, u.get("id"), (msg.get("text") or "")[:30])
     text = msg.get("text", "") or ""
     if msg["chat"]["type"] != "private":
         # admin binds a private admin group for notifications
         if text.startswith("/setadmin") and u["id"] in ADMINS:
             c = cfg(); c["notify"] = chat; save(CFG_F, c)
             say(chat, "✅ Endi barcha soʻrovlar shu guruhga keladi.")
-        elif text.startswith("/setcommunity") and u["id"] in ADMINS:
+        elif text.startswith("/setcommunity") and (u["id"] in ADMINS or (msg.get("sender_chat") or {}).get("id") == chat):
             c = cfg(); c["community"] = chat; save(CFG_F, c)
             say(chat, "✅ Ulandi! Tasdiqlangan zarbalar va PLAYMAX eʼlonlari shu yerga chiqadi.")
         return
@@ -751,12 +752,17 @@ def main():
     start, offset, last_sync = time.time(), None, time.time()
     print("bot started")
     while time.time() - start < RUN_SECONDS:
-        ups = call("getUpdates", offset=offset, timeout=50, allowed_updates=["message", "callback_query"]) or []
+        ups = call("getUpdates", offset=offset, timeout=50, allowed_updates=["message", "callback_query", "channel_post"]) or []
         for up in ups:
             offset = up["update_id"] + 1
             try:
                 if "message" in up:
                     on_message(up["message"])
+                elif "channel_post" in up:
+                    cp = up["channel_post"]
+                    if (cp.get("text") or "").startswith("/setcommunity"):
+                        c = cfg(); c["community"] = cp["chat"]["id"]; save(CFG_F, c)
+                        say(cp["chat"]["id"], "✅ Ulandi! Tasdiqlangan zarbalar va PLAYMAX eʼlonlari shu yerga chiqadi.")
                 elif "callback_query" in up:
                     on_callback(up["callback_query"])
             except Exception as e:
